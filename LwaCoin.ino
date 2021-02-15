@@ -1,17 +1,12 @@
-/*
-  
-*/
-//
-
 
 byte cursor = 0;
 char cursor_symbol = '>';
 
 String settings_lines[4]{
   "Обнулить сумму",
-  "Калибровать",
+  "калибровать",
   "Цель",
-  "test 4"
+  "СТРОКА 4"
 };
 
 #define NONE        0
@@ -48,10 +43,10 @@ const uint8_t logo[] PROGMEM = {
 //-------НАСТРОЙКИ---------
 #define coin_amount 4    // число монет, которые нужно распознать
 float coin_value[coin_amount] = {1, 2, 5, 10};  // стоимость монет
-String currency = "rub"; // валюта (английские буквы!!!)
-int stb_time = 20000;    // время бездействия, через которое система уйдёт в сон (миллисекунды)
+String currency = "рублей";
+int stb_time = 30000;    // время бездействия, через которое система уйдёт в сон (миллисекунды)
 //int screen_time = 10000;
-String label = "Сумма"; //надпись над суммой
+String label = "summ"; //надпись над суммой
 //-------НАСТРОЙКИ---------
 
 #define USE_MICRO_WIRE
@@ -102,8 +97,8 @@ boolean coin_recogn = false;
 //boolean first_start = false;
 boolean serial_debug = false;
 //boolean debug = false;
-//boolean is_goal = false;
-//int goal = 100;
+boolean isGoal = false;
+byte goall = 10;
 
 byte last_coin = 0;
 
@@ -251,10 +246,12 @@ void calibrate(){
   dsp.clear();
   dsp.setScale(2);
   //dsp.setCursor(30, 42);
-  dsp.setCursor((128 - 6 * 12)/2, 4);
-  dsp.print("Готово");
+  dsp.setCursor((127 - 10 * 12)/2, 3);
+  dsp.print("Калибровка");
+  dsp.setCursor((127 - 9 * 12)/2, 3);
+  dsp.print("завершена");
   dsp.update();
-  delay(500);
+  delay(750);
   summ();
   Serial.println("Calibration done");
 }
@@ -313,22 +310,35 @@ void debub() {
 }
 
 void goal(){
-  byte count = 0;
-  
+  byte count = goall;
+  delay(400);
   //dsp.update();
   while(1){
     btn.tick();
     //
+    if (btn.isDouble()){
+      EEPROM.updateInt(12, count);
+      goall = count;
+      summ();
+      break;
+    }
     if (btn.isSingle())count++;
-    if (btn.isStep())count++;
-    //if (btn.isHolded())break;
-    if (count>=100)count = 1;
+    if (btn.isHold()){
+      count++;
+      delay(100);
+    }
+    if (count>100)count = 0;
     dsp.clear();
-    dsp.setCursor((128-12*2)/2, 5);
+    dsp.setCursor((127-12*9)/2, 1);
+    dsp.print("Настройка");
+    dsp.setCursor((127-12*4)/2, 3);
+    dsp.print("цели");
+    dsp.setCursor((127-12*numDigits(count*10))/2, 5);
     dsp.print(count*10);
     dsp.update();
   }
-  //delay(500);
+  delay(500);
+  standby_timer = millis();
 }
 
 void setCoins(){
@@ -354,18 +364,24 @@ void setCoins(){
 }
 
 void settings(boolean doIn = false){
-  if (doIn)cursor++;
-  if (cursor>3)cursor = 0;
-  dsp.clear();
-  for (byte i = 0; i<=3; i++){
-    dsp.setScale(2);
-    dsp.setCursor(12, 2*i);
-    dsp.print(settings_lines[i]);
-  }
   
-  dsp.setCursor(0, 2*cursor);
+  if (doIn)cursor++;
+  else cursor = 0;
+  if (cursor>=3)cursor = 0;
+  dsp.clear();
+  //for (byte i = 0; i<=3; i++){
+  dsp.setScale(2);
+  dsp.setCursor(12, 1);
+  dsp.print("Обнулить");
+  dsp.setCursor(12, 3);
+  dsp.print("Цель");
+  dsp.setCursor(12, 5);
+  dsp.print("Калибр.");
+  
+  dsp.setCursor(0, 1+2*cursor);
   dsp.print(cursor_symbol);
   dsp.update();
+  standby_timer = millis();
 }
 
 
@@ -373,15 +389,37 @@ void summ() {
   dsp.clear();
   //dsp.setTextColor(1);
   dsp.setScale(2);
-  dsp.setCursor((128 - 5*12)/2, 1);
-  dsp.print(label);
-  dsp.setScale(4);
-  dsp.setCursor((128 - numDigits(summ_money)*24)/2, 3);
-  dsp.print(summ_money);
+  if (isGoal && goall*10-summ_money >= 0){
+    dsp.setCursor((128 - 7*12)/2, 1);
+    dsp.print("До цели");
+    //Serial.println(label);
+    dsp.setScale(4);
+    dsp.setCursor((128 - numDigits(goall*10 - summ_money)*24)/2, 3);
+    dsp.print(goall*10 - summ_money);
+  }
+  else if (isGoal && goall*10-summ_money<0){
+    dsp.setCursor((128 - 10*12)/2, 1);
+    dsp.print("Сверх цели");
+    //Serial.println(label);
+    dsp.setScale(4);
+    dsp.setCursor((128 - numDigits(abs(goall*10 - summ_money))*24)/2, 3);
+    dsp.print(abs(goall*10 - summ_money));
+  }
+  else {
+    dsp.setCursor((128 - 5*12)/2, 1);
+    dsp.print("Сумма");
+    //Serial.println(label);
+    dsp.setScale(4);
+    dsp.setCursor((128 - numDigits(summ_money)*24)/2, 3);
+    dsp.print(summ_money);
+  }
   dsp.setScale(2);
-  Serial.println(128 - numDigits(last_coin)*14);
-  dsp.setCursor(126 - numDigits(last_coin)*12, 0);
-  dsp.print(last_coin);
+  dsp.setCursor((128 - 6*12)/2, 7);
+  dsp.print("рублей");
+  //dsp.setScale(2);
+  //Serial.println(128 - numDigits(last_coin)*14);
+  //dsp.setCursor(126 - numDigits(last_coin)*12, 0);
+  //dsp.print(last_coin);
   dsp.update();
 }
 
@@ -395,9 +433,9 @@ void setup() {
   Serial.begin(9600);                   // открыть порт для связи с ПК для отладки
   //Serial.setTimeout(100);
   
-  delay(100);
+  //delay(100);
 
-  //btn.setTimeout(300);
+  //btn.setClickTimeout(100);
   
   attachInterrupt(0, isr, RISING);
 
@@ -429,10 +467,11 @@ void setup() {
   dsp.setContrast(255);
   //dsp.setCursor(0,0);
   //dsp.setScale(3);
-  //dsp.drawBitmap(31, 0, logo, 64, 64, 1);
+  dsp.drawBitmap(31, 0, logo, 64, 64, 1);
   dsp.update();
 
   calibrated = EEPROM.readInt(2);
+  goall = EEPROM.readInt(12);
   //Serial.print("calibrated - ");
   //Serial.println(calibrated);
   
@@ -484,25 +523,27 @@ void loop() {
             mode = NORMAL;
             break;
           case LINE_1:
-            Serial.println("CALIBRATE");
+            Serial.println("GOAL");
+            mode = NORMAL;
+            goal();
+            break;
+          case LINE_2:
+            Serial.println("calibrate");
             calibrate();
             mode = NORMAL;
             summ();
-            break;
-          case LINE_2:
-            Serial.println(cursor);
-            goal();
-            break;
-          case LINE_3:
-            Serial.println(cursor);
             break;
         }
         
       }
     }
+    if (btn.isDouble()){
+      Serial.println("DOUBLE");
+      isGoal = !isGoal;
+      summ();
+    }
     if (btn.isTriple()){
       Serial.println("TRIPLE");
-      //calibrate();
       if (mode == SETTINGS){
         mode = NORMAL;
         summ();
@@ -552,13 +593,13 @@ void loop() {
     if (sens_signal - empty_signal > coin_pass) coin_flag = true;
 
     if (mode == NORMAL){
-    dsp.rect(0,0,24,15, OLED_CLEAR);
+    /*dsp.rect(0,0,24,15, OLED_CLEAR);
     dsp.setScale(2);
     dsp.setCursor(0, 0);
     dsp.print(coin_flag);
     btn.tick();
     dsp.print(btn.state());
-    dsp.update();
+    dsp.update();*/
     }
     /*switch (mode){
       case NORMAL:
