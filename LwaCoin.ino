@@ -1,3 +1,10 @@
+#ifdef SERIAL_DEBUG
+#define DEBUG(x) Serial.print(x)
+#define DEBUGLN(x) Serial.println(x)
+#else
+#define DEBUG(x)
+#define DEBUGLN(x)
+#endif
 
 byte cursor = 0;
 char cursor_symbol = '>';
@@ -14,7 +21,7 @@ String settings_lines[4]{
 #define CALIBRATION 2
 #define SETTINGS    3
 #define ERROR       4
-#define DEBUG       5
+//#define DEBUG       5
 #define CLEAR       6
 #define STATS       7
 
@@ -41,6 +48,7 @@ const uint8_t logo[] PROGMEM = {
 
 
 //-------НАСТРОЙКИ---------
+#define SERIAL_DEBUG 1 //закомментировать чтобы убрать сериал дебаг
 #define coin_amount 4    // число монет, которые нужно распознать
 float coin_value[coin_amount] = {1, 2, 5, 10};  // стоимость монет
 String currency = "рублей";
@@ -61,7 +69,7 @@ byte empty_signal;               // храним уровень пустого �
 unsigned long standby_timer, reset_timer, screen_timer, clock_timer; // таймеры
 int summ_money = 0;            // сумма монет в копилке
 int money_quantity = 0;
-byte delt = 25;                  //трешхолд значения с датчика
+byte delt = 30;                  //трешхолд значения с датчика
 byte empty_treshold = 3;
 byte coin_pass = 4;
 boolean calibrated = false;
@@ -158,7 +166,7 @@ void calibrate(){
   dsp.setCursor((128 - 10*12)/2,3);
   dsp.print("Калибровка");
   dsp.update();
-  delay(500);
+  delay(1000);
   while (1){
     for (byte i = 0; i < coin_amount; i++){
       //coin_signal[i] = 0;
@@ -246,14 +254,17 @@ void calibrate(){
   dsp.clear();
   dsp.setScale(2);
   //dsp.setCursor(30, 42);
-  dsp.setCursor((127 - 10 * 12)/2, 3);
+  dsp.setCursor((127 - 10 * 12)/2, 2);
   dsp.print("Калибровка");
-  dsp.setCursor((127 - 9 * 12)/2, 3);
+  dsp.setCursor((127 - 9 * 12)/2, 4);
   dsp.print("завершена");
   dsp.update();
-  delay(750);
+  delay(1000);
   summ();
-  Serial.println("Calibration done");
+  //ВОЗМОЖНО ЛИШНЕЕ
+  last_sens_signal = empty_signal;
+  //НУ ТИПА
+  DEBUGLN("Calibration done");
 }
 
 void clearCoins(){
@@ -269,7 +280,7 @@ void clearCoins(){
   dsp.setCursor((128-12*7)/2, 4);
   dsp.print("очищена");
   dsp.update();
-  delay(500);
+  delay(1000);
   Serial.println("Memory cleared");
   summ();
 }
@@ -282,7 +293,7 @@ void isr() {
   btn.tick();  // опрашиваем в прерывании, чтобы поймать нажатие в любом случае
 }
 
-
+/*
 void debub() {
   dsp.clear();
   dsp.setCursor(0,0);
@@ -307,11 +318,16 @@ void debub() {
   
   dsp.update();
   //Serial.println("debug");
-}
+}*/
 
 void goal(){
   byte count = goall;
   delay(400);
+  dsp.clear();
+  dsp.setCursor((127-12*9)/2, 1);
+  dsp.print("Настройка");
+  dsp.setCursor((127-12*4)/2, 3);
+  dsp.print("цели");
   //dsp.update();
   while(1){
     btn.tick();
@@ -328,19 +344,15 @@ void goal(){
       delay(100);
     }
     if (count>100)count = 0;
-    dsp.clear();
-    dsp.setCursor((127-12*9)/2, 1);
-    dsp.print("Настройка");
-    dsp.setCursor((127-12*4)/2, 3);
-    dsp.print("цели");
+    dsp.clear(0, 40, 127, 56);
     dsp.setCursor((127-12*numDigits(count*10))/2, 5);
     dsp.print(count*10);
     dsp.update();
   }
-  delay(500);
+  delay(1000);
   standby_timer = millis();
 }
-
+/*
 void setCoins(){
   
   dsp.clear();
@@ -362,6 +374,7 @@ void setCoins(){
   dsp.update();
   delay(1000);
 }
+*/
 
 void settings(boolean doIn = false){
   
@@ -387,7 +400,6 @@ void settings(boolean doIn = false){
 
 void summ() {
   dsp.clear();
-  //dsp.setTextColor(1);
   dsp.setScale(2);
   if (isGoal && goall*10-summ_money >= 0){
     dsp.setCursor((128 - 7*12)/2, 1);
@@ -400,7 +412,6 @@ void summ() {
   else if (isGoal && goall*10-summ_money<0){
     dsp.setCursor((128 - 10*12)/2, 1);
     dsp.print("Сверх цели");
-    //Serial.println(label);
     dsp.setScale(4);
     dsp.setCursor((128 - numDigits(abs(goall*10 - summ_money))*24)/2, 3);
     dsp.print(abs(goall*10 - summ_money));
@@ -430,23 +441,18 @@ void summ() {
 
 void setup() {
   //power.setSystemPrescaler(PRESCALER_2);
-  Serial.begin(9600);                   // открыть порт для связи с ПК для отладки
-  //Serial.setTimeout(100);
+  #ifdef SERIAL_DEBUG
+    Serial.begin(9600);                   // открыть порт для связи с ПК для отладки
+  #endif
+  Serial.begin(9600);
+  DEBUGLN("Serial debug is on");
+  attachInterrupt(0, isr, RISING); 
   
-  //delay(100);
-
-  //btn.setClickTimeout(100);
-  
-  attachInterrupt(0, isr, RISING);
-
-  // пины питания как выходы
-  //pinMode(9, OUTPUT);
   pinMode(disp_power, OUTPUT);
   pinMode(BTNpower, OUTPUT);
   pinMode(LEDpin, OUTPUT);
   pinMode(IRpin, OUTPUT);
 
-  // подать питание на дисплей и датчик
   digitalWrite(disp_power, 1);
   digitalWrite(LEDpin, 1);
   digitalWrite(IRpin, 1);
@@ -454,44 +460,34 @@ void setup() {
 
   delay(100);
   
-
   dsp.init();
-
   Wire.setClock(600000L);
-
   dsp.autoPrintln(false);
   dsp.clear();
-  //dsp.update();
   dsp.flipV(1);
   dsp.flipH(1);
   dsp.setContrast(255);
-  //dsp.setCursor(0,0);
-  //dsp.setScale(3);
-  //dsp.drawBitmap(31, 0, logo, 64, 64, 1);
   dsp.update();
 
-  calibrated = EEPROM.readInt(2);
+  //calibrated = EEPROM.readInt(2);
   goall = EEPROM.readInt(12);
-  //Serial.print("calibrated - ");
-  //Serial.println(calibrated);
   
   for (byte i = 0; i < coin_amount; i++) {
     coin_signal_min[i] = EEPROM.readInt(40 + i * 2);
     coin_signal_max[i] = EEPROM.readInt(60 + i * 2);
-    Serial.print(coin_signal_min[i]);
-    Serial.print(' ');
-    Serial.println(coin_signal_max[i]);
+    DEBUG(coin_signal_min[i]);
+    DEBUG(' ');
+    DEBUGLN(coin_signal_max[i]);
     
     coin_quantity[i] = EEPROM.readInt(20 + i * 2);
     summ_money += coin_quantity[i] * coin_value[i];  // ну и сумму сразу посчитать, как произведение цены монеты на количество
     money_quantity += coin_quantity[i];
 
   }
-  Serial.print("SUMM: ");
-  Serial.print(summ_money);
-  Serial.print(" ");
-  Serial.println(currency);
-  //delay(1000);
+  DEBUG("SUMM: ");
+  DEBUG(summ_money);
+  DEBUG(" ");
+  DEBUGLN(currency);
   
   summ();
 
@@ -504,34 +500,29 @@ void loop() {
   
   last_sens_signal = empty_signal;
   while (1) {
-
-   // Serial.println("tick");
-    
     btn.tick();
     if (btn.state() && sleep_flag){
-      //delay(100);
       wake_up();
     }
     if (btn.state()){
       standby_timer = millis();
     }
-    //btn.tick();
     if (btn.isHolded()){
       Serial.println("HOLDED");
       if (mode==SETTINGS){
         switch (cursor){
           case LINE_0:
-            Serial.println("CLEAR_MEMORY");
+            DEBUGLN("CLEAR_MEMORY");
             clearCoins();
             mode = NORMAL;
             break;
           case LINE_1:
-            Serial.println("GOAL");
+            DEBUGLN("GOAL");
             mode = NORMAL;
             goal();
             break;
           case LINE_2:
-            Serial.println("calibrate");
+            DEBUGLN("calibrate");
             calibrate();
             mode = NORMAL;
             summ();
@@ -541,12 +532,12 @@ void loop() {
       }
     }
     if (btn.isDouble()){
-      Serial.println("DOUBLE");
+      DEBUGLN("DOUBLE TAP");
       isGoal = !isGoal;
       summ();
     }
     if (btn.isTriple()){
-      Serial.println("TRIPLE");
+      DEBUGLN("TRIPLE TAP");
       if (mode == SETTINGS){
         mode = NORMAL;
         summ();
@@ -558,99 +549,44 @@ void loop() {
       
     }
     if (btn.isSingle()){
-      Serial.println("SINGLE");
-      if (mode==DEBUG){
-        Serial.println("ban");
-        mode = NORMAL;
-        summ();
-      }
-      else if (mode==SETTINGS){
+      DEBUGLN("SINGLE TAP");
+      if (mode==SETTINGS){
         settings(1);
-        Serial.println("CRSR UPD");
       }
     }
-    /*if (btn.getClicks() == 5 && mode==NORMAL){
-      //delay(100);
-      mode = DEBUG;
-      debug = true;
-    }*/
-
-
-
-    
-    //btn.tick();
-    /*if (btn.isDouble()){
-      
-      delay(100);
-      Serial.println("//");
-      for (byte i = 0; i < coin_amount; i++) {
-        Serial.print(round(coin_value[i]));
-        Serial.print(" : ");
-        Serial.println(coin_quantity[i]);
-        }
-      Serial.println("//");
-    }*/
     sens_signal = analogRead(IRsens);  // далее такой же алгоритм, как при калибровке
     //Serial.println(sens_signal);
     if (sens_signal > last_sens_signal && sens_signal - empty_signal > 6) last_sens_signal = sens_signal;
-    if (sens_signal - empty_signal > coin_pass) coin_flag = true;
-
-    if (mode == NORMAL){
-    /*dsp.rect(0,0,24,15, OLED_CLEAR);
-    dsp.setScale(2);
-    dsp.setCursor(0, 0);
-    dsp.print(coin_flag);
-    btn.tick();
-    dsp.print(btn.state());
-    dsp.update();*/
-    }
-    /*switch (mode){
-      case NORMAL:
-        break;
-      case NONE:
-        break;
-      case STATS:
-        break;
-      case DEBUG:
-        break;
-    }*/
-
-    //Serial.println("A");
-    
-    
-    
+    if (sens_signal - empty_signal > coin_pass) coin_flag = true;    
     if (coin_flag && (abs(sens_signal - empty_signal)) < empty_treshold) {
       recogn_flag = false;  // флажок ошибки
       // в общем нашли максимум для пролетевшей монетки, записали в last_sens_signal
       // далее начинаем сравнивать со значениями для монет, хранящимися в памяти
       //Serial.println(last_sens_signal);
-
-      
-      
       for (byte i = 0; i < coin_amount; i++) {
-
-        if ((last_sens_signal < coin_signal_min[i]
-          and coin_signal_min[i] - last_sens_signal <= delt)
+        if (
+          (abs(coin_signal_min[i] - last_sens_signal) <= delt)
           or 
-          (last_sens_signal > coin_signal_max[i]
-          and last_sens_signal - coin_signal_max[i] <= delt)
+          (abs(last_sens_signal - coin_signal_max[i]) <= delt)
           or
-          (last_sens_signal >= coin_signal_min[i] and last_sens_signal <= coin_signal_max[i])
+          (last_sens_signal >= coin_signal_min[i]
+          and
+          last_sens_signal <= coin_signal_max[i])
           ){
             // и вот тут если эта разность попадает в диапазон, то считаем монетку распознанной
           summ_money += coin_value[i];  // к сумме тупо прибавляем цену монетки (дада, сумма считается двумя разными способами. При старте системы суммой всех монет, а тут прибавление
           last_coin = coin_value[i];
-          //Serial.println(last_sens_signal);
-          //Serial.println(coin_value[i]);
-          Serial.print("+ ");
-          Serial.print(coin_value[i]);
-          Serial.print(" SUMM: ");
-          Serial.print(summ_money);
-          Serial.print(" ");
-          Serial.println(currency);
-
-          Serial.println(mode);
-          
+          /*
+           * DEBUG("+ ");
+           * DEBUG(coin_value[i]);
+          *DEBUG(" SUMM: ");
+          *DEBUG(summ_money);
+          *DEBUG(" ");
+          *DEBUGLN(currency);
+          */
+          if (coin_signal_min[i] - last_sens_signal <= delt)Serial.println(last_sens_signal-coin_signal_min[i]);
+          else if (last_sens_signal - coin_signal_max[i] <= delt)Serial.println(coin_signal_max[i]-last_sens_signal);
+          else Serial.println("0");
           if (mode == NORMAL)summ();
           
           coin_quantity[i]++;  // для распознанного номера монетки прибавляем количество
@@ -661,8 +597,8 @@ void loop() {
         }
       }
       if (!recogn_flag){
-        Serial.print("ERROR coin not recognised: ");
-        Serial.println(last_sens_signal);
+        DEBUG("ERROR coin not recognised: ");
+        DEBUGLN(last_sens_signal);
       }
       coin_flag = false;
       standby_timer = millis();  // сбросить таймер
