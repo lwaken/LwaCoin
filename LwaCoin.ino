@@ -321,30 +321,34 @@ void debub() {
 }*/
 
 void goal(){
+  Serial.println("FUNC");
   byte count = goall;
-  delay(400);
-  dsp.clear();
-  dsp.setCursor((127-12*9)/2, 1);
-  dsp.print("Настройка");
-  dsp.setCursor((127-12*4)/2, 3);
-  dsp.print("цели");
+  delay(600);
+  
   //dsp.update();
+  Serial.println("LOOP");
   while(1){
     btn.tick();
-    //
     if (btn.isDouble()){
+      Serial.println("GOAL DOUBLE");
       EEPROM.updateInt(12, count);
       goall = count;
       summ();
       break;
     }
-    if (btn.isSingle())count++;
+    if (btn.hasClicks())count+=btn.getClicks();
     if (btn.isHold()){
+      Serial.println("GOAL HOLD");
       count++;
       delay(100);
     }
     if (count>100)count = 0;
-    dsp.clear(0, 40, 127, 56);
+    dsp.clear();
+    dsp.setCursor((127-12*9)/2, 1);
+    dsp.print("Настройка");
+    dsp.setCursor((127-12*4)/2, 3);
+    dsp.print("цели");
+    //dsp.clear(0, 40, 127, 56);
     dsp.setCursor((127-12*numDigits(count*10))/2, 5);
     dsp.print(count*10);
     dsp.update();
@@ -517,9 +521,9 @@ void loop() {
             mode = NORMAL;
             break;
           case LINE_1:
-            DEBUGLN("GOAL");
-            mode = NORMAL;
+            Serial.println("GOAL");
             goal();
+            mode = NORMAL;
             break;
           case LINE_2:
             DEBUGLN("calibrate");
